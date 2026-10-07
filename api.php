@@ -3,10 +3,10 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 
 // CHANGE ONLY THESE FOUR VALUES ON YOUR HOSTING SERVER.
-$host = 'YOUR_MYSQL_HOST';
-$db   = 'YOUR_DATABASE_NAME';
-$user = 'YOUR_DATABASE_USER';
-$pass = 'YOUR_DATABASE_PASSWORD';
+$host = 'localhost';
+$db   = 'hospital_management';
+$user = 'root';
+$pass = '';
 $charset = 'utf8mb4';
 
 try {
@@ -244,6 +244,20 @@ try {
                 }
                 throw $e;
             }
+            break;
+
+        case 'patient_appointments':
+            $patientId = require_patient();
+            $stmt = $pdo->prepare(
+                'SELECT a.id, a.appointment_date, a.appointment_time, a.status, a.created_at,
+                        d.name AS doctor_name, d.specialty
+                 FROM appointments a
+                 INNER JOIN doctors d ON d.id = a.doctor_id
+                 WHERE a.patient_id = ?
+                 ORDER BY a.appointment_date DESC, a.appointment_time DESC, a.id DESC'
+            );
+            $stmt->execute([$patientId]);
+            respond(['success' => true, 'appointments' => $stmt->fetchAll()]);
             break;
 
         case 'admin_appointments':

@@ -245,6 +245,48 @@ async function bookSlot(slotId) {
   }
 }
 
+async function loadPatientAppointments() {
+  const container = $('patientAppointmentList');
+  container.innerHTML = '<p class="muted">Loading appointments...</p>';
+
+  try {
+    const result = await api('patient_appointments');
+    if (!result.success) {
+      container.innerHTML = `<p class="muted">${escapeHtml(result.message)}</p>`;
+      return;
+    }
+
+    if (!result.appointments.length) {
+      container.innerHTML = '<p class="muted">You have no appointments yet.</p>';
+      return;
+    }
+
+    container.innerHTML = '';
+    result.appointments.forEach(appointment => {
+      const card = document.createElement('div');
+      card.className = 'appointment-item';
+      const statusClass = appointment.status.toLowerCase();
+
+      card.innerHTML = `
+        <div class="appointment-main">
+          <div class="appointment-title">
+            <strong>Dr. ${escapeHtml(appointment.doctor_name)}</strong>
+            <span class="status ${statusClass}">${escapeHtml(appointment.status)}</span>
+          </div>
+          <div class="appointment-details">
+            <span><b>Specialty:</b> ${escapeHtml(appointment.specialty)}</span>
+            <span><b>Date:</b> ${escapeHtml(appointment.appointment_date)}</span>
+            <span><b>Time:</b> ${formatTime(appointment.appointment_time)}</span>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  } catch (error) {
+    container.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+  }
+}
+
 async function showAdminScreen() {
   hideAllScreens();
   $('adminScreen').classList.remove('hidden');
@@ -352,6 +394,7 @@ $('adminLoginBtn').addEventListener('click', adminLogin);
 $('patientLogoutBtn').addEventListener('click', logout);
 $('adminLogoutBtn').addEventListener('click', logout);
 $('refreshAppointmentsBtn').addEventListener('click', loadAppointments);
+$('refreshPatientAppointmentsBtn').addEventListener('click', loadPatientAppointments);
 $('doctorSelect').addEventListener('change', loadSlots);
 $('dateSelect').addEventListener('change', loadSlots);
 $('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });

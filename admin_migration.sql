@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS admins (
 -- Username: admin
 -- Password: admin123
 INSERT INTO admins (username, password_hash, name)
-SELECT 'admin', '$2y$12$PyMAlkEyRsKH1qc3a3ij5eoHP8ISujjLekq40RO3nazVxUUsxfZ26', 'System Administrator'
+SELECT 'admin', '$2y$12$0q0T8lNqm11h6R4H6TkHcOfdVDKXYfRZHIe7aYXwhbhChYCKOz1xW', 'System Administrator'
 WHERE NOT EXISTS (SELECT 1 FROM admins WHERE username = 'admin');
 
 -- Future appointment requests are created as PENDING by api.php.

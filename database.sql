@@ -1,11 +1,4 @@
-CREATE DATABASE IF NOT EXISTS hospital_management
-CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE hospital_management;
 
-DROP TABLE IF EXISTS appointments;
-DROP TABLE IF EXISTS doctor_slots;
-DROP TABLE IF EXISTS doctors;
-DROP TABLE IF EXISTS patients;
 
 CREATE TABLE patients (
     id INT AUTO_INCREMENT PRIMARY KEY,

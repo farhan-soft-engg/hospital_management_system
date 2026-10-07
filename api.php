@@ -1,10 +1,10 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-$host = 'localhost';
-$db   = 'hospital_management';
-$user = 'root';
-$pass = '';
+$host = 'YOUR_HOSTED_MYSQL_HOSTNAME';
+$db   = 'YOUR_FULL_DATABASE_NAME';
+$user = 'YOUR_DATABASE_USERNAME';
+$pass = 'YOUR_DATABASE_PASSWORD';
 $charset = 'utf8mb4';
 
 try {

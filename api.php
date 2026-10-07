@@ -1,9 +1,11 @@
 <?php
+session_start();
 header('Content-Type: application/json; charset=utf-8');
 
-$host = 'YOUR_HOSTED_MYSQL_HOSTNAME';
-$db   = 'YOUR_FULL_DATABASE_NAME';
-$user = 'YOUR_DATABASE_USERNAME';
+// CHANGE ONLY THESE FOUR VALUES ON YOUR HOSTING SERVER.
+$host = 'YOUR_MYSQL_HOST';
+$db   = 'YOUR_DATABASE_NAME';
+$user = 'YOUR_DATABASE_USER';
 $pass = 'YOUR_DATABASE_PASSWORD';
 $charset = 'utf8mb4';
 
@@ -12,135 +14,197 @@ try {
         "mysql:host=$host;dbname=$db;charset=$charset",
         $user,
         $pass,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false
+        ]
     );
 } catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['success'=>false,'message'=>'Database connection failed. Import database.sql and check MySQL settings.']);
+    echo json_encode(['success' => false, 'message' => 'Database connection failed. Check api.php MySQL settings.']);
     exit;
 }
 
-$action = $_GET['action'] ?? '';
-
-function body() {
-    return json_decode(file_get_contents('php://input'), true) ?? [];
-}
-function out($data) {
+function respond($data, $status = 200) {
+    http_response_code($status);
     echo json_encode($data);
     exit;
 }
 
-try {
-    if ($action === 'dashboard') {
-        $patients = $pdo->query("SELECT COUNT(*) c FROM patients")->fetch()['c'];
-        $doctors = $pdo->query("SELECT COUNT(*) c FROM doctors")->fetch()['c'];
-        $confirmed = $pdo->query("SELECT COUNT(*) c FROM appointments WHERE status='Confirmed'")->fetch()['c'];
-        $slots = $pdo->query("SELECT COUNT(*) c FROM doctor_slots s WHERE s.slot_date=CURDATE() AND s.is_available=1")->fetch()['c'];
-        $today = $pdo->query("
-            SELECT a.id,a.appointment_date,a.appointment_time,a.status,
-                   p.name patient_name,d.name doctor_name
-            FROM appointments a
-            JOIN patients p ON p.id=a.patient_id
-            JOIN doctors d ON d.id=a.doctor_id
-            WHERE a.appointment_date=CURDATE()
-            ORDER BY a.appointment_time DESC LIMIT 10
-        ")->fetchAll();
-        out(['success'=>true,'stats'=>compact('patients','doctors','confirmed','slots'),'today'=>$today]);
+function require_login() {
+    if (empty($_SESSION['patient_id'])) {
+        respond(['success' => false, 'message' => 'Please login first.'], 401);
     }
-
-    if ($action === 'patients') {
-        $q = trim($_GET['q'] ?? '');
-        $stmt = $pdo->prepare("SELECT * FROM patients
-            WHERE name LIKE ? OR phone LIKE ? OR patient_code LIKE ?
-            ORDER BY id DESC");
-        $like="%$q%"; $stmt->execute([$like,$like,$like]);
-        out(['success'=>true,'patients'=>$stmt->fetchAll()]);
-    }
-
-    if ($action === 'doctors') {
-        $doctors=$pdo->query("SELECT * FROM doctors ORDER BY name")->fetchAll();
-        foreach($doctors as &$d){
-            $s=$pdo->prepare("SELECT appointment_time FROM doctor_slots WHERE doctor_id=? AND slot_date=CURDATE() AND is_available=1 ORDER BY appointment_time");
-            $s->execute([$d['id']]);
-            $d['slots']=$s->fetchAll(PDO::FETCH_COLUMN);
-        }
-        out(['success'=>true,'doctors'=>$doctors]);
-    }
-
-    if ($action === 'appointments') {
-        $q=trim($_GET['q'] ?? '');
-        $status=$_GET['status'] ?? 'all';
-        $sql="SELECT a.id,a.appointment_code,a.appointment_date,a.appointment_time,a.status,
-                     p.name patient_name,p.patient_code,d.name doctor_name,d.specialty
-              FROM appointments a
-              JOIN patients p ON p.id=a.patient_id
-              JOIN doctors d ON d.id=a.doctor_id
-              WHERE (p.name LIKE ? OR d.name LIKE ? OR a.appointment_code LIKE ?)";
-        $params=["%$q%","%$q%","%$q%"];
-        if($status!=='all'){ $sql.=" AND a.status=?"; $params[]=$status; }
-        $sql.=" ORDER BY a.id DESC";
-        $stmt=$pdo->prepare($sql); $stmt->execute($params);
-        out(['success'=>true,'appointments'=>$stmt->fetchAll()]);
-    }
-
-    if ($action === 'create_patient') {
-        $b=body();
-        foreach(['name','phone','age','gender'] as $f) if(empty($b[$f])) out(['success'=>false,'message'=>"Missing $f"]);
-        $code='P'.str_pad((string)((int)$pdo->query("SELECT COALESCE(MAX(id),0)+1 FROM patients")->fetchColumn()),3,'0',STR_PAD_LEFT);
-        $stmt=$pdo->prepare("INSERT INTO patients(patient_code,name,phone,age,gender,address) VALUES(?,?,?,?,?,?)");
-        $stmt->execute([$code,trim($b['name']),trim($b['phone']),(int)$b['age'],$b['gender'],trim($b['address']??'')]);
-        out(['success'=>true,'message'=>'New patient registered successfully.','patient_id'=>$pdo->lastInsertId()]);
-    }
-
-    if ($action === 'availability') {
-        $doctor=(int)($_GET['doctor_id']??0);
-        $date=$_GET['date']??date('Y-m-d');
-        $stmt=$pdo->prepare("SELECT DATE_FORMAT(s.appointment_time,'%H:%i') time
-            FROM doctor_slots s
-            WHERE s.doctor_id=? AND s.slot_date=? AND s.is_available=1
-            ORDER BY s.appointment_time");
-        $stmt->execute([$doctor,$date]);
-        out(['success'=>true,'slots'=>$stmt->fetchAll(PDO::FETCH_COLUMN)]);
-    }
-
-    if ($action === 'create_appointment') {
-        $b=body();
-        foreach(['patient_id','doctor_id','date','time'] as $f) if(empty($b[$f])) out(['success'=>false,'message'=>"Missing $f"]);
-        $pdo->beginTransaction();
-
-        $lock=$pdo->prepare("SELECT id FROM doctor_slots WHERE doctor_id=? AND slot_date=? AND appointment_time=? AND is_available=1 FOR UPDATE");
-        $lock->execute([(int)$b['doctor_id'],$b['date'],$b['time']]);
-        $slot=$lock->fetch();
-        if(!$slot){ $pdo->rollBack(); out(['success'=>false,'message'=>'That doctor slot is no longer available.']); }
-
-        $code='A'.str_pad((string)((int)$pdo->query("SELECT COALESCE(MAX(id),0)+1 FROM appointments")->fetchColumn()),3,'0',STR_PAD_LEFT);
-        $stmt=$pdo->prepare("INSERT INTO appointments(appointment_code,patient_id,doctor_id,appointment_date,appointment_time,status) VALUES(?,?,?,?,?,'Confirmed')");
-        $stmt->execute([$code,(int)$b['patient_id'],(int)$b['doctor_id'],$b['date'],$b['time']]);
-
-        $pdo->prepare("UPDATE doctor_slots SET is_available=0 WHERE id=?")->execute([$slot['id']]);
-        $pdo->commit();
-        out(['success'=>true,'message'=>'Appointment confirmed. Patient informed.','appointment_code'=>$code]);
-    }
-
-    if ($action === 'cancel_appointment') {
-        $b=body();
-        $pdo->beginTransaction();
-        $stmt=$pdo->prepare("SELECT * FROM appointments WHERE id=? AND status='Confirmed' FOR UPDATE");
-        $stmt->execute([(int)$b['id']]);
-        $a=$stmt->fetch();
-        if(!$a){$pdo->rollBack();out(['success'=>false,'message'=>'Appointment not found or already cancelled.']);}
-        $pdo->prepare("UPDATE appointments SET status='Cancelled',cancelled_at=NOW() WHERE id=?")->execute([$a['id']]);
-        $pdo->prepare("UPDATE doctor_slots SET is_available=1 WHERE doctor_id=? AND slot_date=? AND appointment_time=?")
-            ->execute([$a['doctor_id'],$a['appointment_date'],$a['appointment_time']]);
-        $pdo->commit();
-        out(['success'=>true,'message'=>'Appointment cancelled and patient informed.']);
-    }
-
-    out(['success'=>false,'message'=>'Unknown action.']);
-} catch (Throwable $e) {
-    if($pdo->inTransaction()) $pdo->rollBack();
-    http_response_code(500);
-    out(['success'=>false,'message'=>$e->getMessage()]);
+    return (int) $_SESSION['patient_id'];
 }
-?>
+
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
+$input = array_merge($_GET, $_POST);
+
+try {
+    switch ($action) {
+        case 'session':
+            if (empty($_SESSION['patient_id'])) {
+                respond(['success' => true, 'logged_in' => false]);
+            }
+            $stmt = $pdo->prepare('SELECT id, name, phone, age, gender, address FROM patients WHERE id = ?');
+            $stmt->execute([$_SESSION['patient_id']]);
+            $patient = $stmt->fetch();
+            if (!$patient) {
+                session_destroy();
+                respond(['success' => true, 'logged_in' => false]);
+            }
+            respond(['success' => true, 'logged_in' => true, 'patient' => $patient]);
+            break;
+
+        case 'register':
+            $name = trim($input['name'] ?? '');
+            $phone = trim($input['phone'] ?? '');
+            $password = (string) ($input['password'] ?? '');
+            $age = (int) ($input['age'] ?? 0);
+            $gender = trim($input['gender'] ?? '');
+            $address = trim($input['address'] ?? '');
+
+            if ($name === '' || $phone === '' || $password === '' || $age < 1 || $gender === '' || $address === '') {
+                respond(['success' => false, 'message' => 'Please fill in all fields.'], 400);
+            }
+            if (strlen($password) < 6) {
+                respond(['success' => false, 'message' => 'Password must be at least 6 characters.'], 400);
+            }
+
+            $check = $pdo->prepare('SELECT id FROM patients WHERE phone = ? LIMIT 1');
+            $check->execute([$phone]);
+            if ($check->fetch()) {
+                respond(['success' => false, 'message' => 'An account with this phone number already exists. Please login.'], 409);
+            }
+
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare('INSERT INTO patients (name, phone, password_hash, age, gender, address) VALUES (?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$name, $phone, $hash, $age, $gender, $address]);
+            $id = (int) $pdo->lastInsertId();
+
+            $_SESSION['patient_id'] = $id;
+            respond(['success' => true, 'patient' => [
+                'id' => $id, 'name' => $name, 'phone' => $phone,
+                'age' => $age, 'gender' => $gender, 'address' => $address
+            ]]);
+            break;
+
+        case 'login':
+            $phone = trim($input['phone'] ?? '');
+            $password = (string) ($input['password'] ?? '');
+            if ($phone === '' || $password === '') {
+                respond(['success' => false, 'message' => 'Enter phone and password.'], 400);
+            }
+
+            $stmt = $pdo->prepare('SELECT id, name, phone, password_hash, age, gender, address FROM patients WHERE phone = ? LIMIT 1');
+            $stmt->execute([$phone]);
+            $patient = $stmt->fetch();
+
+            if (!$patient || !password_verify($password, $patient['password_hash'])) {
+                respond(['success' => false, 'message' => 'Invalid phone number or password.'], 401);
+            }
+
+            unset($patient['password_hash']);
+            session_regenerate_id(true);
+            $_SESSION['patient_id'] = (int) $patient['id'];
+            respond(['success' => true, 'patient' => $patient]);
+            break;
+
+        case 'logout':
+            $_SESSION = [];
+            if (ini_get('session.use_cookies')) {
+                $params = session_get_cookie_params();
+                setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+            }
+            session_destroy();
+            respond(['success' => true]);
+            break;
+
+        case 'doctors':
+            require_login();
+            $stmt = $pdo->query('SELECT id, name, specialty FROM doctors ORDER BY name');
+            respond(['success' => true, 'doctors' => $stmt->fetchAll()]);
+            break;
+
+        case 'slots':
+            require_login();
+            $doctorId = (int) ($input['doctor_id'] ?? 0);
+            $date = trim($input['date'] ?? '');
+            if ($doctorId < 1 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                respond(['success' => false, 'message' => 'Invalid doctor or date.'], 400);
+            }
+
+            $stmt = $pdo->prepare(
+                'SELECT id, slot_time FROM doctor_slots
+                 WHERE doctor_id = ? AND slot_date = ? AND is_available = 1
+                 ORDER BY slot_time'
+            );
+            $stmt->execute([$doctorId, $date]);
+            respond(['success' => true, 'slots' => $stmt->fetchAll()]);
+            break;
+
+        case 'book':
+            $patientId = require_login();
+            $slotId = (int) ($input['slot_id'] ?? 0);
+            $doctorId = (int) ($input['doctor_id'] ?? 0);
+            $date = trim($input['date'] ?? '');
+
+            if ($slotId < 1 || $doctorId < 1 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                respond(['success' => false, 'message' => 'Invalid appointment request.'], 400);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                // Lock the selected row so two patients cannot book the same slot at once.
+                $stmt = $pdo->prepare(
+                    'SELECT id, doctor_id, slot_date, slot_time, is_available
+                     FROM doctor_slots WHERE id = ? FOR UPDATE'
+                );
+                $stmt->execute([$slotId]);
+                $slot = $stmt->fetch();
+
+                if (!$slot || (int)$slot['doctor_id'] !== $doctorId || $slot['slot_date'] !== $date || (int)$slot['is_available'] !== 1) {
+                    $pdo->rollBack();
+                    respond(['success' => false, 'message' => 'Sorry, this time is no longer available. Please select another time.'], 409);
+                }
+
+                // Also prevent this patient from accidentally making two appointments for the exact same slot.
+                $check = $pdo->prepare('SELECT id FROM appointments WHERE patient_id = ? AND slot_id = ? LIMIT 1');
+                $check->execute([$patientId, $slotId]);
+                if ($check->fetch()) {
+                    $pdo->rollBack();
+                    respond(['success' => false, 'message' => 'You already have this appointment.'], 409);
+                }
+
+                $insert = $pdo->prepare(
+                    'INSERT INTO appointments (patient_id, doctor_id, slot_id, appointment_date, appointment_time, status)
+                     VALUES (?, ?, ?, ?, ?, "CONFIRMED")'
+                );
+                $insert->execute([$patientId, $doctorId, $slotId, $slot['slot_date'], $slot['slot_time']]);
+
+                $update = $pdo->prepare('UPDATE doctor_slots SET is_available = 0 WHERE id = ?');
+                $update->execute([$slotId]);
+
+                $pdo->commit();
+                respond(['success' => true, 'appointment' => [
+                    'id' => (int)$pdo->lastInsertId(),
+                    'slot_time' => $slot['slot_time']
+                ]]);
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                if ($e instanceof PDOException && (int)$e->errorInfo[1] === 1062) {
+                    respond(['success' => false, 'message' => 'Sorry, this time is no longer available. Please select another time.'], 409);
+                }
+                throw $e;
+            }
+            break;
+
+        default:
+            respond(['success' => false, 'message' => 'Invalid action.'], 400);
+    }
+} catch (Throwable $e) {
+    error_log($e->getMessage());
+    respond(['success' => false, 'message' => 'Something went wrong on the server.'], 500);
+}

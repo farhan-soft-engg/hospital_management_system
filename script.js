@@ -1,58 +1,226 @@
-const API="api.php";
-const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-let cache={patients:[],doctors:[],appointments:[]};
+const state = {
+  patient: null,
+  doctors: []
+};
 
-async function api(action, options={}) {
-  const url=API+"?action="+encodeURIComponent(action)+(options.query?"&"+new URLSearchParams(options.query):"");
-  const res=await fetch(url,{method:options.method||"GET",headers:{"Content-Type":"application/json"},body:options.body?JSON.stringify(options.body):undefined});
-  const data=await res.json();
-  if(!data.success) throw new Error(data.message||"Request failed");
-  return data;
+const $ = (id) => document.getElementById(id);
+
+async function api(action, data = {}, method = 'GET') {
+  const params = new URLSearchParams({ action });
+  let url = `api.php?${params.toString()}`;
+  const options = { method, credentials: 'same-origin' };
+  if (method === 'POST') {
+    options.headers = { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' };
+    options.body = new URLSearchParams(data).toString();
+  } else {
+    Object.entries(data).forEach(([key, value]) => params.set(key, value));
+    url = `api.php?${params.toString()}`;
+  }
+  const response = await fetch(url, options);
+  let result;
+  try {
+    result = await response.json();
+  } catch (_) {
+    throw new Error('Server returned an invalid response.');
+  }
+  if (!response.ok && !result.message) throw new Error('Request failed.');
+  return result;
 }
-function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500)}
-function openModal(id){$("#"+id).classList.add("show")}
-function closeModal(id){$("#"+id).classList.remove("show")}
-function today(){return new Date().toISOString().slice(0,10)}
-async function loadPatients(){
-  const d=await api("patients",{query:{q:$("#patientSearch")?.value||""}});
-  cache.patients=d.patients;
-  $("#patientsTable").innerHTML=d.patients.map(p=>`<tr><td>${p.patient_code}</td><td>${p.name}</td><td>${p.phone}</td><td>${p.age}</td><td>${p.gender}</td><td><button class="action-btn" data-patient="${p.id}">Use for appointment</button></td></tr>`).join("")||`<tr><td colspan="6">No patients found.</td></tr>`;
-  fillPatientSelect("#quickPatient");fillPatientSelect("#aPatient");
+
+function showMessage(text, type = 'success') {
+  const box = $('message');
+  box.textContent = text;
+  box.className = `message ${type}`;
+  setTimeout(() => box.classList.add('hidden'), 4000);
 }
-function fillPatientSelect(id){$(id).innerHTML=cache.patients.map(p=>`<option value="${p.id}">${p.name} (${p.patient_code})</option>`).join("")}
-async function loadDoctors(){
-  const d=await api("doctors");cache.doctors=d.doctors;
-  $("#doctorCards").innerHTML=d.doctors.map(x=>`<div class="doctor-card"><h3>${x.name}</h3><p>${x.specialty} · ${x.slots.length} free slots today</p>${x.slots.map(s=>`<span class="slot">${s.slice(0,5)}</span>`).join("")}</div>`).join("");
-  fillDoctorSelect("#quickDoctor");fillDoctorSelect("#aDoctor");
+
+function setAuthMode(register) {
+  $('loginForm').classList.toggle('hidden', register);
+  $('registerForm').classList.toggle('hidden', !register);
 }
-function fillDoctorSelect(id){$(id).innerHTML=cache.doctors.map(d=>`<option value="${d.id}">${d.name} — ${d.specialty}</option>`).join("")}
-async function loadAppointments(){
- const d=await api("appointments",{query:{q:$("#appointmentSearch")?.value||"",status:$("#appointmentStatus")?.value||"all"}});
- cache.appointments=d.appointments;
- $("#appointmentsTable").innerHTML=d.appointments.map(a=>`<tr><td>${a.appointment_code}</td><td>${a.patient_name}</td><td>${a.doctor_name}</td><td>${a.appointment_date}</td><td>${a.appointment_time.slice(0,5)}</td><td><span class="status ${a.status.toLowerCase()}">${a.status}</span></td><td>${a.status==="Confirmed"?`<button class="action-btn cancel" data-cancel="${a.id}">Cancel</button>`:"-"}</td></tr>`).join("")||`<tr><td colspan="7">No appointments found.</td></tr>`;
+
+async function checkSession() {
+  try {
+    const result = await api('session');
+    if (result.logged_in) {
+      state.patient = result.patient;
+      await showPatientScreen();
+    } else {
+      $('authScreen').classList.remove('hidden');
+      $('patientScreen').classList.add('hidden');
+    }
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
 }
-async function loadDashboard(){
- const d=await api("dashboard");
- $("#statPatients").textContent=d.stats.patients;$("#statDoctors").textContent=d.stats.doctors;$("#statConfirmed").textContent=d.stats.confirmed;$("#statSlots").textContent=d.stats.slots;
- $("#todayAppointments").innerHTML=d.today.length?d.today.map(a=>`<div class="list-item"><span><b>${a.appointment_time.slice(0,5)}</b> · ${a.patient_name}<br><small>${a.doctor_name}</small></span><span class="status ${a.status.toLowerCase()}">${a.status}</span></div>`).join(""):`<div class="list-item">No appointments today.</div>`;
+
+async function login() {
+  const phone = $('loginPhone').value.trim();
+  const password = $('loginPassword').value;
+  if (!phone || !password) return showMessage('Enter phone and password.', 'error');
+
+  try {
+    const result = await api('login', { phone, password }, 'POST');
+    if (!result.success) return showMessage(result.message, 'error');
+    state.patient = result.patient;
+    await showPatientScreen();
+    showMessage('Login successful.');
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
 }
-async function refresh(){try{await Promise.all([loadPatients(),loadDoctors(),loadAppointments(),loadDashboard()])}catch(e){toast(e.message)}}
-async function createAppointment(patient_id,doctor_id,date,time){
- const d=await api("create_appointment",{method:"POST",body:{patient_id,doctor_id,date,time}});
- toast(d.message);await refresh();return true;
+
+async function register() {
+  const name = $('registerName').value.trim();
+  const phone = $('registerPhone').value.trim();
+  const password = $('registerPassword').value;
+  const age = $('registerAge').value.trim();
+  const gender = $('registerGender').value;
+  const address = $('registerAddress').value.trim();
+
+  if (!name || !phone || !password || !age || !gender || !address) {
+    return showMessage('Please fill in all fields.', 'error');
+  }
+
+  try {
+    const result = await api('register', { name, phone, password, age, gender, address }, 'POST');
+    if (!result.success) return showMessage(result.message, 'error');
+    state.patient = result.patient;
+    await showPatientScreen();
+    showMessage('Account created successfully.');
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
 }
-function navigate(section){$$(".section").forEach(s=>s.classList.remove("active"));$("#"+section).classList.add("active");$$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.section===section));$("#pageTitle").textContent=section[0].toUpperCase()+section.slice(1)}
-$$(".nav-btn").forEach(b=>b.onclick=()=>navigate(b.dataset.section));
-$("#newPatientBtn").onclick=()=>openModal("patientModal");$("#newAppointmentBtn").onclick=()=>openModal("appointmentModal");
-$$("[data-close]").forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
-$("#patientSearch").oninput=()=>loadPatients();$("#appointmentSearch").oninput=()=>loadAppointments();$("#appointmentStatus").onchange=()=>loadAppointments();
-$("#patientForm").onsubmit=async e=>{e.preventDefault();try{await api("create_patient",{method:"POST",body:{name:$("#pName").value,phone:$("#pPhone").value,age:Number($("#pAge").value),gender:$("#pGender").value,address:$("#pAddress").value}});closeModal("patientModal");e.target.reset();navigate("patients");toast("New patient registered successfully.");await refresh()}catch(x){toast(x.message)}};
-$("#appointmentForm").onsubmit=async e=>{e.preventDefault();try{await createAppointment($("#aPatient").value,$("#aDoctor").value,$("#aDate").value,$("#aTime").value);closeModal("appointmentModal");navigate("appointments")}catch(x){toast(x.message)}};
-$("#quickAppointmentForm").onsubmit=async e=>{e.preventDefault();try{await createAppointment($("#quickPatient").value,$("#quickDoctor").value,$("#quickDate").value,$("#quickTime").value)}catch(x){toast(x.message)}};
-document.addEventListener("click",async e=>{
- const p=e.target.closest("[data-patient]");if(p){$("#aPatient").value=p.dataset.patient;openModal("appointmentModal")}
- const c=e.target.closest("[data-cancel]");
- if(c&&confirm("Cancel this appointment?")){try{const d=await api("cancel_appointment",{method:"POST",body:{id:c.dataset.cancel}});toast(d.message);await refresh()}catch(x){toast(x.message)}}
-});
-$("#quickDate").value=today();$("#aDate").value=today();
-refresh();
+
+async function logout() {
+  try { await api('logout'); } catch (_) {}
+  state.patient = null;
+  $('patientScreen').classList.add('hidden');
+  $('authScreen').classList.remove('hidden');
+  $('loginPassword').value = '';
+}
+
+async function showPatientScreen() {
+  $('authScreen').classList.add('hidden');
+  $('patientScreen').classList.remove('hidden');
+  $('patientName').textContent = state.patient.name;
+
+  const today = new Date().toISOString().slice(0, 10);
+  $('dateSelect').min = today;
+  if (!$('dateSelect').value) $('dateSelect').value = today;
+
+  await loadDoctors();
+  loadSlots();
+}
+
+async function loadDoctors() {
+  const result = await api('doctors');
+  if (!result.success) throw new Error(result.message);
+  state.doctors = result.doctors;
+
+  const select = $('doctorSelect');
+  select.innerHTML = '<option value="">Select doctor</option>';
+  state.doctors.forEach(doctor => {
+    const option = document.createElement('option');
+    option.value = doctor.id;
+    option.textContent = `${doctor.name} — ${doctor.specialty}`;
+    select.appendChild(option);
+  });
+}
+
+function showDoctorInfo() {
+  const doctor = state.doctors.find(d => String(d.id) === String($('doctorSelect').value));
+  const box = $('doctorInfo');
+  if (!doctor) {
+    box.classList.add('hidden');
+    return;
+  }
+  box.innerHTML = `<strong>${escapeHtml(doctor.name)}</strong><span>${escapeHtml(doctor.specialty)}</span>`;
+  box.classList.remove('hidden');
+}
+
+async function loadSlots() {
+  showDoctorInfo();
+  const doctorId = $('doctorSelect').value;
+  const date = $('dateSelect').value;
+  const container = $('slots');
+
+  if (!doctorId || !date) {
+    container.innerHTML = '<p class="muted">Select a doctor and date.</p>';
+    return;
+  }
+
+  container.innerHTML = '<p class="muted">Checking available times...</p>';
+
+  try {
+    const result = await api('slots', { doctor_id: doctorId, date });
+    if (!result.success) {
+      container.innerHTML = `<p class="muted">${escapeHtml(result.message)}</p>`;
+      return;
+    }
+
+    if (!result.slots.length) {
+      container.innerHTML = '<p class="muted">No available times for this doctor on this date.</p>';
+      return;
+    }
+
+    container.innerHTML = '';
+    result.slots.forEach(slot => {
+      const button = document.createElement('button');
+      button.className = 'slot-btn';
+      button.textContent = formatTime(slot.slot_time);
+      button.addEventListener('click', () => bookSlot(slot.id));
+      container.appendChild(button);
+    });
+  } catch (error) {
+    container.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function bookSlot(slotId) {
+  const doctorId = $('doctorSelect').value;
+  const date = $('dateSelect').value;
+  if (!doctorId || !date) return;
+
+  const buttons = [...document.querySelectorAll('.slot-btn')];
+  buttons.forEach(button => button.disabled = true);
+
+  try {
+    const result = await api('book', { slot_id: slotId, doctor_id: doctorId, date }, 'POST');
+    if (result.success) {
+      showMessage(`Appointment confirmed for ${formatTime(result.appointment.slot_time)}.`, 'success');
+      await loadSlots();
+    } else {
+      showMessage(result.message, 'error');
+      await loadSlots();
+    }
+  } catch (error) {
+    showMessage(error.message, 'error');
+    await loadSlots();
+  }
+}
+
+function formatTime(time) {
+  const [hours, minutes] = time.split(':').map(Number);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const hour = hours % 12 || 12;
+  return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}`;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[char]));
+}
+
+$('showRegisterBtn').addEventListener('click', () => setAuthMode(true));
+$('showLoginBtn').addEventListener('click', () => setAuthMode(false));
+$('loginBtn').addEventListener('click', login);
+$('registerBtn').addEventListener('click', register);
+$('logoutBtn').addEventListener('click', logout);
+$('doctorSelect').addEventListener('change', loadSlots);
+$('dateSelect').addEventListener('change', loadSlots);
+$('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+checkSession();

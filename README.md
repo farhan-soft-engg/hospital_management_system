@@ -1,55 +1,43 @@
-# Hospital Management System — PHP + MySQL
+# Hospital Management System — Patient Appointment Version
 
-## Technology
-- Frontend: HTML, CSS, JavaScript
-- Backend: PHP (PDO)
-- Database: MySQL
+This version follows the requested flow and intentionally keeps the feature set small:
 
-## Database tables
-1. `patients`
-2. `doctors`
-3. `doctor_slots`
-4. `appointments`
+1. Patient opens the website.
+2. Existing patient logs in with phone + password.
+3. New patient creates an account.
+4. Patient sees doctors.
+5. Patient selects a date and sees available times.
+6. Patient selects a time.
+7. PHP checks the selected slot in MySQL inside a transaction with `FOR UPDATE`.
+8. If available, an appointment is created and the slot becomes unavailable.
+9. If another patient already took the slot, the patient is informed that the time is no longer available and no appointment is created.
 
-## How to run with XAMPP
+## Files
 
-1. Install XAMPP.
-2. Start **Apache** and **MySQL** from the XAMPP Control Panel.
-3. Copy this whole folder into:
-   `C:\xampp\htdocs\hospital_management_system`
-4. Open `http://localhost/phpmyadmin`
-5. Create/import the database:
-   - Click **Import**
-   - Select `database.sql`
-   - Run the import.
-6. Open:
-   `http://localhost/hospital_management_system/`
+- `index.html` — patient login/register and appointment screen
+- `style.css` — UI
+- `script.js` — browser logic
+- `api.php` — PHP API, session login and booking transaction
+- `database.sql` — MySQL tables, doctors and sample appointment slots
 
-The PHP API connects using:
-- host: `localhost`
-- database: `hospital_management`
-- username: `root`
-- password: empty
+## InfinityFree setup
 
-If your MySQL root account has a password, edit the `$pass` value in `api.php`.
+1. Create a MySQL database in the hosting control panel.
+2. Open phpMyAdmin for that database.
+3. Import `database.sql` while the hosting-created database is selected.
+4. Upload `index.html`, `style.css`, `script.js`, and `api.php` into the web root (`htdocs`).
+5. Do NOT put your real database password into the public GitHub repository.
+6. On the hosting server, open `api.php` and replace:
 
-## Scenario implementation
+```php
+$host = 'YOUR_MYSQL_HOST';
+$db   = 'YOUR_DATABASE_NAME';
+$user = 'YOUR_DATABASE_USER';
+$pass = 'YOUR_DATABASE_PASSWORD';
+```
 
-Patient:
-- Existing patient details are retrieved from MySQL.
-- New patient details can be registered.
-- Patient requests an appointment.
-
-Assistant:
-- Checks doctor availability.
-- Confirms the appointment.
-- Can cancel an appointment at any time.
-
-System:
-- Stores patients, doctors, slots and appointments.
-- Prevents double-booking by locking the selected free slot.
-- Releases the slot after cancellation.
-- Shows confirmation/cancellation notification in the UI.
+with the exact values from the hosting control panel.
 
 ## Important
-This is a university-project prototype. Authentication, role-based permissions, CSRF protection, audit logging, and production security should be added before real-world deployment.
+
+This is a university/demo project. It does not include production-grade admin authentication, role management, email/SMS notifications, CSRF protection, audit logging, or medical-data compliance controls. Do not use real patient medical information on this demo deployment.

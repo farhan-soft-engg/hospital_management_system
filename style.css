@@ -9,7 +9,7 @@ body { margin: 0; min-height: 100vh; background: #f3f6fa; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 
-.page { width: min(100% - 32px, 1000px); margin: 0 auto; padding: 40px 0; }
+.page { width: min(100% - 32px, 1100px); margin: 0 auto; padding: 40px 0; }
 .hidden { display: none !important; }
 
 .card {
@@ -27,20 +27,13 @@ h3 { margin: 28px 0 12px; font-size: 17px; }
 
 label { display: block; margin: 14px 0 7px; font-weight: 600; font-size: 14px; }
 input, select, textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 11px 12px;
-  outline: none;
-  background: #fff;
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
+  padding: 11px 12px; outline: none; background: #fff;
 }
 input:focus, select:focus, textarea:focus { border-color: #4b77be; }
 
-.primary, .secondary, .slot-btn {
-  border: 0;
-  border-radius: 8px;
-  padding: 11px 16px;
-  font-weight: 700;
+.primary, .secondary, .slot-btn, .confirm-btn, .cancel-btn {
+  border: 0; border-radius: 8px; padding: 11px 16px; font-weight: 700;
 }
 .primary { width: 100%; margin-top: 20px; background: #1d4ed8; color: #fff; }
 .primary:hover { background: #1e40af; }
@@ -53,7 +46,7 @@ input:focus, select:focus, textarea:focus { border-color: #4b77be; }
   margin-bottom: 22px;
 }
 .topbar p { margin: 6px 0 0; color: #657083; }
-.booking-card { padding: 28px; }
+.booking-card, .admin-card { padding: 28px; }
 .hint { color: #657083; margin-top: 0; }
 .selectors { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
 .doctor-info { margin-top: 18px; padding: 14px; background: #f5f8fc; border-radius: 9px; }
@@ -64,6 +57,24 @@ input:focus, select:focus, textarea:focus { border-color: #4b77be; }
 .slot-btn:hover { background: #dbe8ff; }
 .slot-btn:disabled { opacity: .55; cursor: not-allowed; }
 
+.admin-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.appointment-list { display: grid; gap: 12px; }
+.appointment-item {
+  border: 1px solid #dce3ec; border-radius: 10px; padding: 16px;
+  display: flex; justify-content: space-between; gap: 18px; align-items: center;
+}
+.appointment-title { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.status { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 9px; }
+.status.pending { background: #fff4d6; color: #8a5a00; }
+.status.confirmed { background: #dcfce7; color: #166534; }
+.status.cancelled { background: #fee2e2; color: #991b1b; }
+.appointment-details { display: grid; gap: 5px; color: #526174; font-size: 14px; }
+.appointment-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.confirm-btn { background: #137333; color: #fff; }
+.cancel-btn { background: #b42318; color: #fff; }
+.confirm-btn:hover { background: #0f5e29; }
+.cancel-btn:hover { background: #8f1c14; }
+
 .message {
   position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
   width: min(calc(100% - 32px), 600px); padding: 14px 18px;
@@ -73,11 +84,15 @@ input:focus, select:focus, textarea:focus { border-color: #4b77be; }
 .message.error { background: #b42318; }
 .message.success { background: #137333; }
 
-@media (max-width: 650px) {
-  .page { width: min(100% - 20px, 1000px); padding: 20px 0; }
+@media (max-width: 700px) {
+  .page { width: min(100% - 20px, 1100px); padding: 20px 0; }
   .auth-card { margin: 20px auto; padding: 22px; }
   .selectors { grid-template-columns: 1fr; gap: 0; }
   .topbar { align-items: flex-start; }
   .topbar h1 { font-size: 20px; }
-  .booking-card { padding: 20px; }
+  .booking-card, .admin-card { padding: 20px; }
+  .admin-heading { align-items: stretch; }
+  .appointment-item { align-items: flex-start; flex-direction: column; }
+  .appointment-actions { width: 100%; }
+  .appointment-actions button { flex: 1; }
 }

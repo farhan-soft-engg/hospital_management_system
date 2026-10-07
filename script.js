@@ -1,5 +1,7 @@
 const state = {
+  role: null,
   patient: null,
+  admin: null,
   doctors: []
 };
 
@@ -34,20 +36,39 @@ function showMessage(text, type = 'success') {
   setTimeout(() => box.classList.add('hidden'), 4000);
 }
 
-function setAuthMode(register) {
-  $('loginForm').classList.toggle('hidden', register);
-  $('registerForm').classList.toggle('hidden', !register);
+function hideAllScreens() {
+  $('authScreen').classList.add('hidden');
+  $('patientScreen').classList.add('hidden');
+  $('adminScreen').classList.add('hidden');
+}
+
+function setAuthMode(mode) {
+  $('loginForm').classList.toggle('hidden', mode !== 'patient');
+  $('registerForm').classList.toggle('hidden', mode !== 'register');
+  $('adminLoginForm').classList.toggle('hidden', mode !== 'admin');
+
+  $('authSubtitle').textContent = mode === 'admin' ? 'Administrator Login' :
+    mode === 'register' ? 'Create Patient Account' : 'Patient Login';
 }
 
 async function checkSession() {
   try {
     const result = await api('session');
-    if (result.logged_in) {
+    if (!result.logged_in) {
+      hideAllScreens();
+      $('authScreen').classList.remove('hidden');
+      setAuthMode('patient');
+      return;
+    }
+
+    if (result.role === 'admin') {
+      state.role = 'admin';
+      state.admin = result.admin;
+      await showAdminScreen();
+    } else {
+      state.role = 'patient';
       state.patient = result.patient;
       await showPatientScreen();
-    } else {
-      $('authScreen').classList.remove('hidden');
-      $('patientScreen').classList.add('hidden');
     }
   } catch (error) {
     showMessage(error.message, 'error');
@@ -62,6 +83,7 @@ async function login() {
   try {
     const result = await api('login', { phone, password }, 'POST');
     if (!result.success) return showMessage(result.message, 'error');
+    state.role = 'patient';
     state.patient = result.patient;
     await showPatientScreen();
     showMessage('Login successful.');
@@ -85,6 +107,7 @@ async function register() {
   try {
     const result = await api('register', { name, phone, password, age, gender, address }, 'POST');
     if (!result.success) return showMessage(result.message, 'error');
+    state.role = 'patient';
     state.patient = result.patient;
     await showPatientScreen();
     showMessage('Account created successfully.');
@@ -93,16 +116,37 @@ async function register() {
   }
 }
 
+async function adminLogin() {
+  const username = $('adminUsername').value.trim();
+  const password = $('adminPassword').value;
+  if (!username || !password) return showMessage('Enter admin username and password.', 'error');
+
+  try {
+    const result = await api('admin_login', { username, password }, 'POST');
+    if (!result.success) return showMessage(result.message, 'error');
+    state.role = 'admin';
+    state.admin = result.admin;
+    await showAdminScreen();
+    showMessage('Admin login successful.');
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
 async function logout() {
   try { await api('logout'); } catch (_) {}
+  state.role = null;
   state.patient = null;
-  $('patientScreen').classList.add('hidden');
+  state.admin = null;
+  hideAllScreens();
   $('authScreen').classList.remove('hidden');
+  setAuthMode('patient');
   $('loginPassword').value = '';
+  $('adminPassword').value = '';
 }
 
 async function showPatientScreen() {
-  $('authScreen').classList.add('hidden');
+  hideAllScreens();
   $('patientScreen').classList.remove('hidden');
   $('patientName').textContent = state.patient.name;
 
@@ -189,7 +233,7 @@ async function bookSlot(slotId) {
   try {
     const result = await api('book', { slot_id: slotId, doctor_id: doctorId, date }, 'POST');
     if (result.success) {
-      showMessage(`Appointment confirmed for ${formatTime(result.appointment.slot_time)}.`, 'success');
+      showMessage(`Appointment request submitted for ${formatTime(result.appointment.slot_time)}. Waiting for admin confirmation.`, 'success');
       await loadSlots();
     } else {
       showMessage(result.message, 'error');
@@ -198,6 +242,90 @@ async function bookSlot(slotId) {
   } catch (error) {
     showMessage(error.message, 'error');
     await loadSlots();
+  }
+}
+
+async function showAdminScreen() {
+  hideAllScreens();
+  $('adminScreen').classList.remove('hidden');
+  $('adminName').textContent = state.admin.name || state.admin.username;
+  await loadAppointments();
+}
+
+async function loadAppointments() {
+  const container = $('appointmentList');
+  container.innerHTML = '<p class="muted">Loading appointments...</p>';
+
+  try {
+    const result = await api('admin_appointments');
+    if (!result.success) {
+      container.innerHTML = `<p class="muted">${escapeHtml(result.message)}</p>`;
+      return;
+    }
+
+    if (!result.appointments.length) {
+      container.innerHTML = '<p class="muted">No appointments yet.</p>';
+      return;
+    }
+
+    container.innerHTML = '';
+    result.appointments.forEach(appointment => {
+      const card = document.createElement('div');
+      card.className = 'appointment-item';
+      const statusClass = appointment.status.toLowerCase();
+
+      const actionHtml = appointment.status === 'PENDING'
+        ? `<div class="appointment-actions">
+             <button class="confirm-btn" data-id="${appointment.id}">Confirm</button>
+             <button class="cancel-btn" data-id="${appointment.id}">Cancel</button>
+           </div>`
+        : appointment.status === 'CONFIRMED'
+          ? `<div class="appointment-actions"><button class="cancel-btn" data-id="${appointment.id}">Cancel</button></div>`
+          : '<span class="muted">No action</span>';
+
+      card.innerHTML = `
+        <div class="appointment-main">
+          <div class="appointment-title">
+            <strong>${escapeHtml(appointment.patient_name)}</strong>
+            <span class="status ${statusClass}">${escapeHtml(appointment.status)}</span>
+          </div>
+          <div class="appointment-details">
+            <span><b>Phone:</b> ${escapeHtml(appointment.patient_phone)}</span>
+            <span><b>Doctor:</b> ${escapeHtml(appointment.doctor_name)} (${escapeHtml(appointment.specialty)})</span>
+            <span><b>Date:</b> ${escapeHtml(appointment.appointment_date)}</span>
+            <span><b>Time:</b> ${formatTime(appointment.appointment_time)}</span>
+          </div>
+        </div>
+        ${actionHtml}
+      `;
+      container.appendChild(card);
+    });
+
+    container.querySelectorAll('.confirm-btn').forEach(btn => {
+      btn.addEventListener('click', () => updateAppointment(btn.dataset.id, 'confirm'));
+    });
+    container.querySelectorAll('.cancel-btn').forEach(btn => {
+      btn.addEventListener('click', () => updateAppointment(btn.dataset.id, 'cancel'));
+    });
+  } catch (error) {
+    container.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function updateAppointment(appointmentId, action) {
+  const message = action === 'confirm'
+    ? 'Confirm this appointment?'
+    : 'Cancel this appointment? The time slot will become available again.';
+
+  if (!window.confirm(message)) return;
+
+  try {
+    const apiAction = action === 'confirm' ? 'admin_confirm' : 'admin_cancel';
+    const result = await api(apiAction, { appointment_id: appointmentId }, 'POST');
+    showMessage(result.message, result.success ? 'success' : 'error');
+    if (result.success) await loadAppointments();
+  } catch (error) {
+    showMessage(error.message, 'error');
   }
 }
 
@@ -214,13 +342,19 @@ function escapeHtml(value) {
   }[char]));
 }
 
-$('showRegisterBtn').addEventListener('click', () => setAuthMode(true));
-$('showLoginBtn').addEventListener('click', () => setAuthMode(false));
+$('showRegisterBtn').addEventListener('click', () => setAuthMode('register'));
+$('showLoginBtn').addEventListener('click', () => setAuthMode('patient'));
+$('showAdminBtn').addEventListener('click', () => setAuthMode('admin'));
+$('showPatientBtn').addEventListener('click', () => setAuthMode('patient'));
 $('loginBtn').addEventListener('click', login);
 $('registerBtn').addEventListener('click', register);
-$('logoutBtn').addEventListener('click', logout);
+$('adminLoginBtn').addEventListener('click', adminLogin);
+$('patientLogoutBtn').addEventListener('click', logout);
+$('adminLogoutBtn').addEventListener('click', logout);
+$('refreshAppointmentsBtn').addEventListener('click', loadAppointments);
 $('doctorSelect').addEventListener('change', loadSlots);
 $('dateSelect').addEventListener('change', loadSlots);
 $('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+$('adminPassword').addEventListener('keydown', e => { if (e.key === 'Enter') adminLogin(); });
 
 checkSession();

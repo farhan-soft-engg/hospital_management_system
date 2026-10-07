@@ -32,11 +32,18 @@ function respond($data, $status = 200) {
     exit;
 }
 
-function require_login() {
-    if (empty($_SESSION['patient_id'])) {
-        respond(['success' => false, 'message' => 'Please login first.'], 401);
+function require_patient() {
+    if (empty($_SESSION['patient_id']) || !empty($_SESSION['admin_id'])) {
+        respond(['success' => false, 'message' => 'Please login as a patient first.'], 401);
     }
     return (int) $_SESSION['patient_id'];
+}
+
+function require_admin() {
+    if (empty($_SESSION['admin_id'])) {
+        respond(['success' => false, 'message' => 'Please login as an admin first.'], 401);
+    }
+    return (int) $_SESSION['admin_id'];
 }
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
@@ -45,17 +52,29 @@ $input = array_merge($_GET, $_POST);
 try {
     switch ($action) {
         case 'session':
+            if (!empty($_SESSION['admin_id'])) {
+                $stmt = $pdo->prepare('SELECT id, username, name FROM admins WHERE id = ?');
+                $stmt->execute([$_SESSION['admin_id']]);
+                $admin = $stmt->fetch();
+                if (!$admin) {
+                    unset($_SESSION['admin_id']);
+                    respond(['success' => true, 'logged_in' => false]);
+                }
+                respond(['success' => true, 'logged_in' => true, 'role' => 'admin', 'admin' => $admin]);
+            }
+
             if (empty($_SESSION['patient_id'])) {
                 respond(['success' => true, 'logged_in' => false]);
             }
+
             $stmt = $pdo->prepare('SELECT id, name, phone, age, gender, address FROM patients WHERE id = ?');
             $stmt->execute([$_SESSION['patient_id']]);
             $patient = $stmt->fetch();
             if (!$patient) {
-                session_destroy();
+                unset($_SESSION['patient_id']);
                 respond(['success' => true, 'logged_in' => false]);
             }
-            respond(['success' => true, 'logged_in' => true, 'patient' => $patient]);
+            respond(['success' => true, 'logged_in' => true, 'role' => 'patient', 'patient' => $patient]);
             break;
 
         case 'register':
@@ -84,6 +103,8 @@ try {
             $stmt->execute([$name, $phone, $hash, $age, $gender, $address]);
             $id = (int) $pdo->lastInsertId();
 
+            session_regenerate_id(true);
+            unset($_SESSION['admin_id']);
             $_SESSION['patient_id'] = $id;
             respond(['success' => true, 'patient' => [
                 'id' => $id, 'name' => $name, 'phone' => $phone,
@@ -108,8 +129,31 @@ try {
 
             unset($patient['password_hash']);
             session_regenerate_id(true);
+            unset($_SESSION['admin_id']);
             $_SESSION['patient_id'] = (int) $patient['id'];
             respond(['success' => true, 'patient' => $patient]);
+            break;
+
+        case 'admin_login':
+            $username = trim($input['username'] ?? '');
+            $password = (string) ($input['password'] ?? '');
+            if ($username === '' || $password === '') {
+                respond(['success' => false, 'message' => 'Enter admin username and password.'], 400);
+            }
+
+            $stmt = $pdo->prepare('SELECT id, username, name, password_hash FROM admins WHERE username = ? LIMIT 1');
+            $stmt->execute([$username]);
+            $admin = $stmt->fetch();
+
+            if (!$admin || !password_verify($password, $admin['password_hash'])) {
+                respond(['success' => false, 'message' => 'Invalid admin username or password.'], 401);
+            }
+
+            unset($admin['password_hash']);
+            session_regenerate_id(true);
+            unset($_SESSION['patient_id']);
+            $_SESSION['admin_id'] = (int) $admin['id'];
+            respond(['success' => true, 'admin' => $admin]);
             break;
 
         case 'logout':
@@ -123,13 +167,13 @@ try {
             break;
 
         case 'doctors':
-            require_login();
+            require_patient();
             $stmt = $pdo->query('SELECT id, name, specialty FROM doctors ORDER BY name');
             respond(['success' => true, 'doctors' => $stmt->fetchAll()]);
             break;
 
         case 'slots':
-            require_login();
+            require_patient();
             $doctorId = (int) ($input['doctor_id'] ?? 0);
             $date = trim($input['date'] ?? '');
             if ($doctorId < 1 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
@@ -146,7 +190,7 @@ try {
             break;
 
         case 'book':
-            $patientId = require_login();
+            $patientId = require_patient();
             $slotId = (int) ($input['slot_id'] ?? 0);
             $doctorId = (int) ($input['doctor_id'] ?? 0);
             $date = trim($input['date'] ?? '');
@@ -157,7 +201,6 @@ try {
 
             $pdo->beginTransaction();
             try {
-                // Lock the selected row so two patients cannot book the same slot at once.
                 $stmt = $pdo->prepare(
                     'SELECT id, doctor_id, slot_date, slot_time, is_available
                      FROM doctor_slots WHERE id = ? FOR UPDATE'
@@ -170,7 +213,6 @@ try {
                     respond(['success' => false, 'message' => 'Sorry, this time is no longer available. Please select another time.'], 409);
                 }
 
-                // Also prevent this patient from accidentally making two appointments for the exact same slot.
                 $check = $pdo->prepare('SELECT id FROM appointments WHERE patient_id = ? AND slot_id = ? LIMIT 1');
                 $check->execute([$patientId, $slotId]);
                 if ($check->fetch()) {
@@ -178,25 +220,110 @@ try {
                     respond(['success' => false, 'message' => 'You already have this appointment.'], 409);
                 }
 
+                // Appointment starts as PENDING. An admin must confirm it.
                 $insert = $pdo->prepare(
                     'INSERT INTO appointments (patient_id, doctor_id, slot_id, appointment_date, appointment_time, status)
-                     VALUES (?, ?, ?, ?, ?, "CONFIRMED")'
+                     VALUES (?, ?, ?, ?, ?, "PENDING")'
                 );
                 $insert->execute([$patientId, $doctorId, $slotId, $slot['slot_date'], $slot['slot_time']]);
 
                 $update = $pdo->prepare('UPDATE doctor_slots SET is_available = 0 WHERE id = ?');
                 $update->execute([$slotId]);
 
+                $appointmentId = (int)$pdo->lastInsertId();
                 $pdo->commit();
                 respond(['success' => true, 'appointment' => [
-                    'id' => (int)$pdo->lastInsertId(),
-                    'slot_time' => $slot['slot_time']
+                    'id' => $appointmentId,
+                    'slot_time' => $slot['slot_time'],
+                    'status' => 'PENDING'
                 ]]);
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 if ($e instanceof PDOException && (int)$e->errorInfo[1] === 1062) {
                     respond(['success' => false, 'message' => 'Sorry, this time is no longer available. Please select another time.'], 409);
                 }
+                throw $e;
+            }
+            break;
+
+        case 'admin_appointments':
+            require_admin();
+            $stmt = $pdo->query(
+                'SELECT a.id, a.appointment_date, a.appointment_time, a.status, a.created_at,
+                        p.name AS patient_name, p.phone AS patient_phone,
+                        d.name AS doctor_name, d.specialty
+                 FROM appointments a
+                 INNER JOIN patients p ON p.id = a.patient_id
+                 INNER JOIN doctors d ON d.id = a.doctor_id
+                 ORDER BY CASE WHEN a.status = "PENDING" THEN 0 ELSE 1 END,
+                          a.appointment_date, a.appointment_time, a.id'
+            );
+            respond(['success' => true, 'appointments' => $stmt->fetchAll()]);
+            break;
+
+        case 'admin_confirm':
+            require_admin();
+            $appointmentId = (int) ($input['appointment_id'] ?? 0);
+            if ($appointmentId < 1) respond(['success' => false, 'message' => 'Invalid appointment.'], 400);
+
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare('SELECT id, status FROM appointments WHERE id = ? FOR UPDATE');
+                $stmt->execute([$appointmentId]);
+                $appointment = $stmt->fetch();
+
+                if (!$appointment) {
+                    $pdo->rollBack();
+                    respond(['success' => false, 'message' => 'Appointment not found.'], 404);
+                }
+                if ($appointment['status'] !== 'PENDING') {
+                    $pdo->rollBack();
+                    respond(['success' => false, 'message' => 'Only pending appointments can be confirmed.'], 409);
+                }
+
+                $update = $pdo->prepare('UPDATE appointments SET status = "CONFIRMED" WHERE id = ?');
+                $update->execute([$appointmentId]);
+                $pdo->commit();
+                respond(['success' => true, 'message' => 'Appointment confirmed.']);
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
+            }
+            break;
+
+        case 'admin_cancel':
+            require_admin();
+            $appointmentId = (int) ($input['appointment_id'] ?? 0);
+            if ($appointmentId < 1) respond(['success' => false, 'message' => 'Invalid appointment.'], 400);
+
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare(
+                    'SELECT id, slot_id, status FROM appointments WHERE id = ? FOR UPDATE'
+                );
+                $stmt->execute([$appointmentId]);
+                $appointment = $stmt->fetch();
+
+                if (!$appointment) {
+                    $pdo->rollBack();
+                    respond(['success' => false, 'message' => 'Appointment not found.'], 404);
+                }
+                if ($appointment['status'] === 'CANCELLED') {
+                    $pdo->rollBack();
+                    respond(['success' => false, 'message' => 'Appointment is already cancelled.'], 409);
+                }
+
+                $updateAppointment = $pdo->prepare('UPDATE appointments SET status = "CANCELLED" WHERE id = ?');
+                $updateAppointment->execute([$appointmentId]);
+
+                // A cancelled appointment releases its time slot again.
+                $updateSlot = $pdo->prepare('UPDATE doctor_slots SET is_available = 1 WHERE id = ?');
+                $updateSlot->execute([$appointment['slot_id']]);
+
+                $pdo->commit();
+                respond(['success' => true, 'message' => 'Appointment cancelled. The time slot is available again.']);
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
                 throw $e;
             }
             break;

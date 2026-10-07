@@ -1,7 +1,8 @@
-# Hospital Management System — Patient Appointment Version
+# Hospital Management System — Patient + Admin Appointment Version
 
-This version follows the requested flow and intentionally keeps the feature set small:
+This version keeps the patient flow simple and adds an administrator who confirms or cancels appointment requests.
 
+## Patient flow
 1. Patient opens the website.
 2. Existing patient logs in with phone + password.
 3. New patient creates an account.
@@ -9,35 +10,32 @@ This version follows the requested flow and intentionally keeps the feature set 
 5. Patient selects a date and sees available times.
 6. Patient selects a time.
 7. PHP checks the selected slot in MySQL inside a transaction with `FOR UPDATE`.
-8. If available, an appointment is created and the slot becomes unavailable.
-9. If another patient already took the slot, the patient is informed that the time is no longer available and no appointment is created.
+8. If available, a `PENDING` appointment is created and the slot becomes unavailable.
+9. Patient sees that the request is waiting for admin confirmation.
+
+## Admin flow
+1. Click **Admin Login** on the first screen.
+2. Login with the demo admin account:
+   - Username: `admin`
+   - Password: `admin123`
+3. Admin sees appointment requests.
+4. Admin can **Confirm** a pending appointment.
+5. Admin can **Cancel** a pending or confirmed appointment.
+6. When an appointment is cancelled, its time slot becomes available again.
 
 ## Files
-
-- `index.html` — patient login/register and appointment screen
+- `index.html` — patient login/register, patient booking screen, admin login and admin panel
 - `style.css` — UI
 - `script.js` — browser logic
-- `api.php` — PHP API, session login and booking transaction
-- `database.sql` — MySQL tables, doctors and sample appointment slots
+- `api.php` — PHP API, patient/admin sessions, booking and admin actions
+- `database.sql` — MySQL tables, demo admin, doctors and sample appointment slots
 
 ## InfinityFree setup
-
-1. Create a MySQL database in the hosting control panel.
-2. Open phpMyAdmin for that database.
-3. Import `database.sql` while the hosting-created database is selected.
-4. Upload `index.html`, `style.css`, `script.js`, and `api.php` into the web root (`htdocs`).
-5. Do NOT put your real database password into the public GitHub repository.
-6. On the hosting server, open `api.php` and replace:
-
-```php
-$host = 'YOUR_MYSQL_HOST';
-$db   = 'YOUR_DATABASE_NAME';
-$user = 'YOUR_DATABASE_USER';
-$pass = 'YOUR_DATABASE_PASSWORD';
-```
-
-with the exact values from the hosting control panel.
+1. Select your hosting-created MySQL database in phpMyAdmin.
+2. If this is a fresh/test database, import `database.sql`. **This file drops the existing project tables first**, so do not use it where you need to preserve existing data.
+3. Upload `index.html`, `style.css`, `script.js`, and `api.php` into the correct `htdocs` web root.
+4. Open `api.php` on the hosting server and replace the four database placeholders with your actual InfinityFree values.
+5. Do not put your real database password into public GitHub.
 
 ## Important
-
-This is a university/demo project. It does not include production-grade admin authentication, role management, email/SMS notifications, CSRF protection, audit logging, or medical-data compliance controls. Do not use real patient medical information on this demo deployment.
+This is a university/demo project. The default admin password is intentionally simple for classroom testing. Change it before any non-demo use. The project does not include production-grade RBAC, CSRF protection, audit logging, email/SMS notifications, or medical-data compliance controls.

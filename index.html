@@ -10,7 +10,7 @@
   <main class="page">
     <section id="authScreen" class="card auth-card">
       <h1>Hospital Management System</h1>
-      <p class="subtitle">Patient Login</p>
+      <p class="subtitle" id="authSubtitle">Patient Login</p>
 
       <div id="loginForm">
         <label for="loginPhone">Phone</label>
@@ -21,6 +21,7 @@
 
         <button id="loginBtn" class="primary">Login</button>
         <p class="switch">New patient? <button id="showRegisterBtn" class="link-btn">Create Account</button></p>
+        <p class="switch"><button id="showAdminBtn" class="link-btn">Admin Login</button></p>
       </div>
 
       <div id="registerForm" class="hidden">
@@ -52,6 +53,19 @@
         <button id="registerBtn" class="primary">Create Account</button>
         <p class="switch">Already have an account? <button id="showLoginBtn" class="link-btn">Login</button></p>
       </div>
+
+      <div id="adminLoginForm" class="hidden">
+        <p class="subtitle">Administrator Login</p>
+
+        <label for="adminUsername">Username</label>
+        <input id="adminUsername" type="text" placeholder="Enter admin username" autocomplete="username">
+
+        <label for="adminPassword">Password</label>
+        <input id="adminPassword" type="password" placeholder="Enter admin password" autocomplete="current-password">
+
+        <button id="adminLoginBtn" class="primary">Admin Login</button>
+        <p class="switch"><button id="showPatientBtn" class="link-btn">Back to Patient Login</button></p>
+      </div>
     </section>
 
     <section id="patientScreen" class="hidden">
@@ -60,12 +74,12 @@
           <h1>Hospital Management System</h1>
           <p>Welcome, <span id="patientName"></span></p>
         </div>
-        <button id="logoutBtn" class="secondary">Logout</button>
+        <button id="patientLogoutBtn" class="secondary">Logout</button>
       </header>
 
       <section class="card booking-card">
         <h2>Request Appointment</h2>
-        <p class="hint">Select a doctor, date and available time.</p>
+        <p class="hint">Select a doctor, date and available time. An admin will confirm your appointment.</p>
 
         <div class="selectors">
           <div>
@@ -85,6 +99,29 @@
         <h3>Available Time</h3>
         <div id="slots" class="slots">
           <p class="muted">Select a doctor and date.</p>
+        </div>
+      </section>
+    </section>
+
+    <section id="adminScreen" class="hidden">
+      <header class="topbar">
+        <div>
+          <h1>Admin Panel</h1>
+          <p>Welcome, <span id="adminName"></span></p>
+        </div>
+        <button id="adminLogoutBtn" class="secondary">Logout</button>
+      </header>
+
+      <section class="card admin-card">
+        <div class="admin-heading">
+          <div>
+            <h2>Appointments</h2>
+            <p class="hint">Confirm or cancel patient appointment requests.</p>
+          </div>
+          <button id="refreshAppointmentsBtn" class="secondary">Refresh</button>
+        </div>
+        <div id="appointmentList" class="appointment-list">
+          <p class="muted">Loading appointments...</p>
         </div>
       </section>
     </section>

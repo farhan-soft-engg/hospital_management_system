@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hospital Management System</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">✚</div>
+      <div>
+        <h2>HMS</h2>
+        <span>Hospital Management</span>
+      </div>
+    </div>
+
+    <nav>
+      <button class="nav-btn active" data-section="dashboard">Dashboard</button>
+      <button class="nav-btn" data-section="patients">Patients</button>
+      <button class="nav-btn" data-section="doctors">Doctors</button>
+      <button class="nav-btn" data-section="appointments">Appointments</button>
+    </nav>
+
+    <div class="sidebar-note">
+      <strong>Scenario</strong>
+      <p>Patients request appointments. Assistants check doctor availability, confirm or cancel appointments, and patients are notified.</p>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Hospital Management System</p>
+        <h1 id="pageTitle">Dashboard</h1>
+      </div>
+      <div class="assistant-badge">Assistant Portal</div>
+    </header>
+
+    <section id="dashboard" class="section active">
+      <div class="stats">
+        <div class="stat-card"><span>Total Patients</span><strong id="statPatients">0</strong></div>
+        <div class="stat-card"><span>Doctors</span><strong id="statDoctors">0</strong></div>
+        <div class="stat-card"><span>Confirmed</span><strong id="statConfirmed">0</strong></div>
+        <div class="stat-card"><span>Available Slots</span><strong id="statSlots">0</strong></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Quick Appointment</h3><p>Request an appointment for a patient.</p></div>
+            <span class="pill">Patient → Assistant</span>
+          </div>
+          <form id="quickAppointmentForm" class="form-grid">
+            <label>Patient
+              <select id="quickPatient" required></select>
+            </label>
+            <label>Doctor
+              <select id="quickDoctor" required></select>
+            </label>
+            <label>Date
+              <input id="quickDate" type="date" required />
+            </label>
+            <label>Time
+              <select id="quickTime" required></select>
+            </label>
+            <button class="primary full" type="submit">Request & Confirm</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Today's Appointments</h3><p>Latest appointment activity.</p></div>
+          </div>
+          <div id="todayAppointments" class="list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="patients" class="section">
+      <div class="section-actions">
+        <div><h2>Patients</h2><p>Existing patients can be retrieved; new patients can update their details.</p></div>
+        <button class="primary" id="newPatientBtn">+ New Patient</button>
+      </div>
+      <div class="card">
+        <div class="toolbar"><input id="patientSearch" placeholder="Search by name, phone or ID..." /></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Age</th><th>Gender</th><th>Action</th></tr></thead>
+            <tbody id="patientsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="doctors" class="section">
+      <div class="section-actions">
+        <div><h2>Doctors</h2><p>Doctor schedules and free appointment slots.</p></div>
+      </div>
+      <div id="doctorCards" class="doctor-grid"></div>
+    </section>
+
+    <section id="appointments" class="section">
+      <div class="section-actions">
+        <div><h2>Appointments</h2><p>Confirm, view and cancel patient appointments.</p></div>
+        <button class="primary" id="newAppointmentBtn">+ Request Appointment</button>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <input id="appointmentSearch" placeholder="Search appointment..." />
+          <select id="appointmentStatus">
+            <option value="all">All status</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Time</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="appointmentsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal" id="patientModal">
+    <div class="modal-box">
+      <button class="close" data-close="patientModal">×</button>
+      <h2>New Patient Registration</h2>
+      <p>Update patient details before requesting an appointment.</p>
+      <form id="patientForm" class="form-grid">
+        <label>Full Name<input id="pName" required /></label>
+        <label>Phone<input id="pPhone" required /></label>
+        <label>Age<input id="pAge" type="number" min="0" max="120" required /></label>
+        <label>Gender<select id="pGender" required><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></label>
+        <label class="wide">Address<textarea id="pAddress" rows="3"></textarea></label>
+        <button class="primary wide" type="submit">Save Patient</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="appointmentModal">
+    <div class="modal-box">
+      <button class="close" data-close="appointmentModal">×</button>
+      <h2>Request Appointment</h2>
+      <p>The assistant checks the selected doctor's availability before confirmation.</p>
+      <form id="appointmentForm" class="form-grid">
+        <label>Patient<select id="aPatient" required></select></label>
+        <label>Doctor<select id="aDoctor" required></select></label>
+        <label>Date<input id="aDate" type="date" required /></label>
+        <label>Time<select id="aTime" required></select></label>
+        <button class="primary wide" type="submit">Check Availability & Confirm</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="script.js"></script>
+</body>
+</html>

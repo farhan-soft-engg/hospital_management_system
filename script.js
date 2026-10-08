@@ -150,7 +150,7 @@ async function showPatientScreen() {
   $('patientScreen').classList.remove('hidden');
   $('patientName').textContent = state.patient.name;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDate();
   $('dateSelect').min = today;
   if (!$('dateSelect').value) $('dateSelect').value = today;
 

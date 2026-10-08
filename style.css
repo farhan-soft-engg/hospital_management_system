@@ -96,3 +96,29 @@ input:focus, select:focus, textarea:focus { border-color: #4b77be; }
   .appointment-actions { width: 100%; }
   .appointment-actions button { flex: 1; }
 }
+/* Admin appointment sections */
+
+.admin-appointment-section {
+  margin-top: 28px;
+}
+
+.admin-appointment-section:first-of-type {
+  margin-top: 0;
+}
+
+.section-heading {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dce3ec;
+}
+
+.section-heading h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.section-description {
+  margin: 5px 0 0;
+  color: #657083;
+  font-size: 14px;
+}

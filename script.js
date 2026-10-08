@@ -286,75 +286,225 @@ async function loadPatientAppointments() {
     container.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
   }
 }
-
 async function showAdminScreen() {
   hideAllScreens();
   $('adminScreen').classList.remove('hidden');
   $('adminName').textContent = state.admin.name || state.admin.username;
+
+  setupAdminAppointmentSections();
   await loadAppointments();
 }
 
-async function loadAppointments() {
+function setupAdminAppointmentSections() {
   const container = $('appointmentList');
-  container.innerHTML = '<p class="muted">Loading appointments...</p>';
+
+  // Don't create the sections more than once
+  if ($('todayAppointmentsSection')) return;
+
+  const parent = container.parentElement;
+
+  const todaySection = document.createElement('div');
+  todaySection.id = 'todayAppointmentsSection';
+  todaySection.className = 'admin-appointment-section';
+
+  todaySection.innerHTML = `
+    <div class="section-heading">
+      <div>
+        <h3>Today's Appointments</h3>
+        <p class="section-description">Appointments scheduled for today.</p>
+      </div>
+    </div>
+    <div id="todayAppointmentList" class="appointment-list">
+      <p class="muted">Loading appointments...</p>
+    </div>
+  `;
+
+  const historySection = document.createElement('div');
+  historySection.id = 'historyAppointmentsSection';
+  historySection.className = 'admin-appointment-section';
+
+  historySection.innerHTML = `
+    <div class="section-heading">
+      <div>
+        <h3>Appointment History</h3>
+        <p class="section-description">Previous appointments.</p>
+      </div>
+    </div>
+    <div id="historyAppointmentList" class="appointment-list">
+      <p class="muted">Loading appointments...</p>
+    </div>
+  `;
+
+  // Replace the original appointment container
+  parent.insertBefore(todaySection, container);
+  parent.insertBefore(historySection, todaySection.nextSibling);
+
+  container.classList.add('hidden');
+}
+
+
+function getLocalDate() {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+
+async function loadAppointments() {
+  setupAdminAppointmentSections();
+
+  const todayContainer = $('todayAppointmentList');
+  const historyContainer = $('historyAppointmentList');
+
+  todayContainer.innerHTML = '<p class="muted">Loading appointments...</p>';
+  historyContainer.innerHTML = '<p class="muted">Loading appointments...</p>';
 
   try {
     const result = await api('admin_appointments');
+
     if (!result.success) {
-      container.innerHTML = `<p class="muted">${escapeHtml(result.message)}</p>`;
+      todayContainer.innerHTML =
+        `<p class="muted">${escapeHtml(result.message)}</p>`;
+
+      historyContainer.innerHTML =
+        `<p class="muted">${escapeHtml(result.message)}</p>`;
+
       return;
     }
 
-    if (!result.appointments.length) {
-      container.innerHTML = '<p class="muted">No appointments yet.</p>';
-      return;
-    }
+    const today = getLocalDate();
 
-    container.innerHTML = '';
-    result.appointments.forEach(appointment => {
-      const card = document.createElement('div');
-      card.className = 'appointment-item';
-      const statusClass = appointment.status.toLowerCase();
+    // Separate today's appointments from previous appointments
+    const todaysAppointments = result.appointments.filter(
+      appointment => appointment.appointment_date === today
+    );
 
-      const actionHtml = appointment.status === 'PENDING'
-        ? `<div class="appointment-actions">
-             <button class="confirm-btn" data-id="${appointment.id}">Confirm</button>
-             <button class="cancel-btn" data-id="${appointment.id}">Cancel</button>
-           </div>`
-        : appointment.status === 'CONFIRMED'
-          ? `<div class="appointment-actions"><button class="cancel-btn" data-id="${appointment.id}">Cancel</button></div>`
-          : '<span class="muted">No action</span>';
+    const historyAppointments = result.appointments.filter(
+      appointment => appointment.appointment_date < today
+    );
 
-      card.innerHTML = `
-        <div class="appointment-main">
-          <div class="appointment-title">
-            <strong>${escapeHtml(appointment.patient_name)}</strong>
-            <span class="status ${statusClass}">${escapeHtml(appointment.status)}</span>
-          </div>
-          <div class="appointment-details">
-            <span><b>Phone:</b> ${escapeHtml(appointment.patient_phone)}</span>
-            <span><b>Doctor:</b> ${escapeHtml(appointment.doctor_name)} (${escapeHtml(appointment.specialty)})</span>
-            <span><b>Date:</b> ${escapeHtml(appointment.appointment_date)}</span>
-            <span><b>Time:</b> ${formatTime(appointment.appointment_time)}</span>
-          </div>
-        </div>
-        ${actionHtml}
-      `;
-      container.appendChild(card);
-    });
+    renderAdminAppointments(
+      todaysAppointments,
+      todayContainer,
+      'No appointments scheduled for today.'
+    );
 
-    container.querySelectorAll('.confirm-btn').forEach(btn => {
-      btn.addEventListener('click', () => updateAppointment(btn.dataset.id, 'confirm'));
-    });
-    container.querySelectorAll('.cancel-btn').forEach(btn => {
-      btn.addEventListener('click', () => updateAppointment(btn.dataset.id, 'cancel'));
-    });
+    renderAdminAppointments(
+      historyAppointments,
+      historyContainer,
+      'No previous appointments.'
+    );
+
   } catch (error) {
-    container.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+    todayContainer.innerHTML =
+      `<p class="muted">${escapeHtml(error.message)}</p>`;
+
+    historyContainer.innerHTML =
+      `<p class="muted">${escapeHtml(error.message)}</p>`;
   }
 }
 
-async function updateAppointment(appointmentId, action) {
+
+function renderAdminAppointments(appointments, container, emptyMessage) {
+  if (!appointments.length) {
+    container.innerHTML = `<p class="muted">${emptyMessage}</p>`;
+    return;
+  }
+
+  container.innerHTML = '';
+
+  appointments.forEach(appointment => {
+    const card = document.createElement('div');
+    card.className = 'appointment-item';
+
+    const statusClass = appointment.status.toLowerCase();
+
+    const actionHtml = appointment.status === 'PENDING'
+      ? `
+        <div class="appointment-actions">
+          <button
+            class="confirm-btn"
+            data-id="${appointment.id}">
+            Confirm
+          </button>
+
+          <button
+            class="cancel-btn"
+            data-id="${appointment.id}">
+            Cancel
+          </button>
+        </div>
+      `
+      : appointment.status === 'CONFIRMED'
+        ? `
+          <div class="appointment-actions">
+            <button
+              class="cancel-btn"
+              data-id="${appointment.id}">
+              Cancel
+            </button>
+          </div>
+        `
+        : '<span class="muted">No action</span>';
+
+    card.innerHTML = `
+      <div class="appointment-main">
+        <div class="appointment-title">
+          <strong>${escapeHtml(appointment.patient_name)}</strong>
+
+          <span class="status ${statusClass}">
+            ${escapeHtml(appointment.status)}
+          </span>
+        </div>
+
+        <div class="appointment-details">
+          <span>
+            <b>Phone:</b>
+            ${escapeHtml(appointment.patient_phone)}
+          </span>
+
+          <span>
+            <b>Doctor:</b>
+            ${escapeHtml(appointment.doctor_name)}
+            (${escapeHtml(appointment.specialty)})
+          </span>
+
+          <span>
+            <b>Date:</b>
+            ${escapeHtml(appointment.appointment_date)}
+          </span>
+
+          <span>
+            <b>Time:</b>
+            ${formatTime(appointment.appointment_time)}
+          </span>
+        </div>
+      </div>
+
+      ${actionHtml}
+    `;
+
+    container.appendChild(card);
+  });
+
+  // Confirm buttons
+  container.querySelectorAll('.confirm-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      updateAppointment(btn.dataset.id, 'confirm');
+    });
+  });
+
+  // Cancel buttons
+  container.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      updateAppointment(btn.dataset.id, 'cancel');
+    });
+  });
+}async function updateAppointment(appointmentId, action) {
   const message = action === 'confirm'
     ? 'Confirm this appointment?'
     : 'Cancel this appointment? The time slot will become available again.';

@@ -3,143 +3,127 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hospital Management System</title>
+  <meta name="theme-color" content="#0e5aa7">
+  <title>CityCare Hospital | Care for Every Life</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <header class="site-header" id="siteHeader">
+    <a href="#home" class="brand" id="homeBrand" aria-label="CityCare Hospital home"><span class="brand-mark">✚</span><span>CityCare <b>Hospital</b><small>Care for every life</small></span></a>
+    <nav class="main-nav" aria-label="Main navigation">
+    </nav>
+    <div class="role-actions" id="roleActions">
+      <button class="btn btn-primary btn-small" id="homePatientLogin">Patient Login</button>
+      <button class="btn btn-outline btn-small" id="homeAdminLogin">Admin Login</button>
+      <button class="btn btn-doctor btn-small" id="homeDoctorLogin">Doctor Login</button>
+    </div>
+  </header>
+
   <main class="page">
-    <section id="authScreen" class="card auth-card">
-      <h1>Hospital Website</h1>
-      <p class="subtitle" id="authSubtitle">Patient Login</p>
-
-      <div id="loginForm">
-        <label for="loginPhone">Phone</label>
-        <input id="loginPhone" type="text" placeholder="Enter phone number" autocomplete="username">
-
-        <label for="loginPassword">Password</label>
-        <input id="loginPassword" type="password" placeholder="Enter password" autocomplete="current-password">
-
-        <button id="loginBtn" class="primary">Login</button>
-        <p class="switch">New patient? <button id="showRegisterBtn" class="link-btn">Create Account</button></p>
-        <p class="switch"><button id="showAdminBtn" class="link-btn">Admin Login</button></p>
+    <section id="homeScreen" class="home-screen">
+      <div class="hero" id="home">
+        <div class="hero-copy">
+          <span class="eyebrow"><span class="pulse-dot"></span> Compassionate care, modern medicine</span>
+          <h1>Your health.<br><span>Our priority.</span></h1>
+          <p>Welcome to CityCare Hospital, where experienced healthcare professionals and modern facilities come together to care for you and your family.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" id="heroBookBtn">Book an Appointment</button>
+          </div>
+          <div class="hero-stats"><div><strong>24/7</strong><span>Patient-first care</span></div><div><strong>Expert</strong><span>Medical team</span></div><div><strong>Modern</strong><span>Healthcare</span></div></div>
+        </div>
+        <div class="hero-visual" aria-label="Hospital building illustration">
+          <div class="image-glow"></div>
+          <img class="hospital-image" src="hospital-hero.jpg" alt="Modern hospital building with a welcoming entrance" onerror="this.style.display='none'; this.parentElement.classList.add('image-fallback')">
+          <div class="floating-card floating-card-top"><span class="float-icon">✚</span><span><b>Care you can trust</b><small>Every patient matters</small></span></div>
+          <div class="floating-card floating-card-bottom"><span class="online-dot"></span><span><b>Here for your health</b><small>Professional, compassionate care</small></span></div>
+        </div>
       </div>
+      <section class="quick-features" aria-label="Hospital services">
+        <article><span class="feature-icon">♡</span><div><h3>Patient-first care</h3><p>Respectful care centered on your needs.</p></div></article>
+        <article id="doctorsCard" class="clickable-card"><span class="feature-icon">✚</span><div><h3>Experienced doctors <span>→</span></h3><p>Click to view our specialist doctor list.</p></div></article>
+        <article><span class="feature-icon">◷</span><div><h3>Simple appointments</h3><p>Choose an available time online.</p></div></article>
+      </section>
+      <section class="about-section" id="about">
+        <div class="about-art"><div class="about-cross">✚</div><span class="about-caption">Health · Hope · Humanity</span></div>
+        <div class="about-copy"><span class="eyebrow">ABOUT CITYCARE</span><h2>A hospital built around people</h2><p>CityCare Hospital was established with a simple purpose: to make dependable, compassionate healthcare easier to access for our community. Over the years, the hospital has continued to develop its medical services, welcome dedicated healthcare professionals, and improve the patient experience.</p><p>Our hospital management system supports that mission by helping patients request appointments and helping administrators and doctors coordinate care clearly and efficiently.</p><button class="btn btn-primary" id="aboutLoginBtn">Get started</button></div>
+      </section>
+      <footer class="site-footer"><span>✚ CityCare Hospital</span><span>Care for every life · Your health matters</span></footer>
+    </section>
 
-      <div id="registerForm" class="hidden">
-       
-
-        <label for="registerName">Full Name</label>
-        <input id="registerName" type="text" placeholder="Enter full name">
-
-        <label for="registerPhone">Phone</label>
-        <input id="registerPhone" type="text" placeholder="Enter phone number">
-
-        <label for="registerPassword">Password</label>
-        <input id="registerPassword" type="password" placeholder="Create password" autocomplete="new-password">
-
-        <label for="registerAge">Age</label>
-        <input id="registerAge" type="number" min="1" max="120" placeholder="Enter age">
-
-        <label for="registerGender">Gender</label>
-        <select id="registerGender">
-          <option value="">Select gender</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-         
-        </select>
-
-        <label for="registerAddress">Address</label>
-        <textarea id="registerAddress" rows="3" placeholder="Enter address"></textarea>
-
-        <button id="registerBtn" class="primary">Create Account</button>
-        <p class="switch">Already have an account? <button id="showLoginBtn" class="link-btn">Login</button></p>
+    <!-- Doctors List Modal Popup -->
+    <div id="doctorsModal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Our Experienced Doctors</h2>
+          <button id="closeDoctorsModal" class="close-btn">&times;</button>
+        </div>
+        <div id="doctorsModalList" class="doctors-grid">
+          <p class="muted">Loading doctor list...</p>
+        </div>
+        <div class="modal-footer">
+          <button id="modalBookBtn" class="btn btn-primary">Book an Appointment</button>
+        </div>
       </div>
+    </div>
 
-      <div id="adminLoginForm" class="hidden">
-       
-
-        <label for="adminUsername">Username</label>
-        <input id="adminUsername" type="text" placeholder="Enter admin username" autocomplete="username">
-
-        <label for="adminPassword">Password</label>
-        <input id="adminPassword" type="password" placeholder="Enter admin password" autocomplete="current-password">
-
-        <button id="adminLoginBtn" class="primary">Admin Login</button>
-        <p class="switch"><button id="showPatientBtn" class="link-btn">Back to Patient Login</button></p>
+    <section id="authScreen" class="auth-screen hidden">
+      <div class="auth-aside"><a href="#home" class="brand brand-light" id="authBrand"><span class="brand-mark">✚</span><span>CityCare <b>Hospital</b><small>Care for every life</small></span></a><div><span class="eyebrow">WELCOME TO CITYCARE</span><h2>Care begins with a connection.</h2><p>Sign in to manage appointments and coordinate patient care.</p></div><div class="auth-aside-bottom">Secure access for patients, doctors and administrators.</div></div>
+      <div class="auth-main">
+        <div id="loginForm" class="auth-form">
+          <span class="form-icon patient-icon">♡</span><h1>Patient Login</h1><p class="subtitle">Welcome back. Sign in to continue.</p>
+          <label for="loginPhone">Phone number</label><input id="loginPhone" type="text" placeholder="Enter your phone number" autocomplete="username">
+          <label for="loginPassword">Password</label><input id="loginPassword" type="password" placeholder="Enter your password" autocomplete="current-password">
+          <button id="loginBtn" class="btn btn-primary btn-full">Login to your account</button>
+          <p class="switch">New patient? <button id="showRegisterBtn" class="link-btn">Create an account</button></p>
+        </div>
+        <div id="registerForm" class="auth-form hidden">
+          <span class="form-icon patient-icon">＋</span><h1>Create account</h1><p class="subtitle">Register as a new patient.</p>
+          <label for="registerName">Full name</label><input id="registerName" type="text" placeholder="Enter full name" autocomplete="name">
+          <label for="registerPhone">Phone number</label><input id="registerPhone" type="text" placeholder="Enter phone number" autocomplete="tel">
+          <label for="registerPassword">Password</label><input id="registerPassword" type="password" placeholder="At least 6 characters" autocomplete="new-password">
+          <div class="form-grid"><div><label for="registerAge">Age</label><input id="registerAge" type="number" min="1" max="120" placeholder="Age"></div><div><label for="registerGender">Gender</label><select id="registerGender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div></div>
+          <label for="registerAddress">Address</label><textarea id="registerAddress" rows="2" placeholder="Enter address"></textarea>
+          <button id="registerBtn" class="btn btn-primary btn-full">Create account</button><p class="switch">Already registered? <button id="showLoginBtn" class="link-btn">Login</button></p>
+        </div>
+        <div id="adminLoginForm" class="auth-form hidden">
+          <span class="form-icon admin-icon">⚙</span><h1>Admin Login</h1><p class="subtitle">Sign in to manage hospital appointments.</p>
+          <label for="adminUsername">Username</label><input id="adminUsername" type="text" placeholder="Enter admin username" autocomplete="username">
+          <label for="adminPassword">Password</label><input id="adminPassword" type="password" placeholder="Enter password" autocomplete="current-password">
+          <button id="adminLoginBtn" class="btn btn-primary btn-full">Admin login</button>
+        </div>
+        <div id="doctorLoginForm" class="auth-form hidden">
+          <span class="form-icon doctor-icon">✚</span><h1>Doctor Login</h1><p class="subtitle">Sign in to view today's appointments.</p>
+          <label for="doctorUsername">Doctor username</label><input id="doctorUsername" type="text" placeholder="e.g. doctor1" autocomplete="username">
+          <label for="doctorPassword">Password</label><input id="doctorPassword" type="password" placeholder="Enter password" autocomplete="current-password">
+          <button id="doctorLoginBtn" class="btn btn-doctor btn-full">Doctor login</button>
+          <p class="form-note">Demo login details are included in README.md. Change demo passwords before real use.</p>
+        </div>
       </div>
     </section>
 
-    <section id="patientScreen" class="hidden">
-      <header class="topbar">
-        <div>
-          <h1>Welcome, <span id="patientName"></span></h1>
-          
-        </div>
-        <button id="patientLogoutBtn" class="secondary">Logout</button>
-      </header>
-
-      <section class="card booking-card">
-        <h2>Request Appointment</h2>
-        <p class="hint">Select a doctor, date and available time. An admin will confirm your appointment.</p>
-
-        <div class="selectors">
-          <div>
-            <label for="doctorSelect">Doctor</label>
-            <select id="doctorSelect">
-              <option value="">Select doctor</option>
-            </select>
-          </div>
-          <div>
-            <label for="dateSelect">Date</label>
-            <input id="dateSelect" type="date">
-          </div>
-        </div>
-
-        <div id="doctorInfo" class="doctor-info hidden"></div>
-
-        <h3>Available Time</h3>
-        <div id="slots" class="slots">
-          <p class="muted">Select a doctor and date.</p>
-        </div>
-      </section>
-
-      <section class="card appointments-card">
-        <div class="admin-heading">
-          <div>
-            <h2>My Appointments</h2>
-            <p class="hint">See your appointments and their current status.</p>
-          </div>
-          <button id="refreshPatientAppointmentsBtn" class="secondary">Refresh</button>
-        </div>
-        <div id="patientAppointmentList" class="appointment-list">
-          <p class="muted">Loading appointments...</p>
-        </div>
-      </section>
+    <section id="patientScreen" class="dashboard hidden">
+      <header class="dashboard-header"><a href="#home" class="brand" id="patientBrand"><span class="brand-mark">✚</span><span>CityCare <b>Hospital</b><small>Patient portal</small></span></a><div class="welcome-user"><span class="avatar">P</span><span>Welcome, <b id="patientName"></b></span><button id="patientLogoutBtn" class="btn btn-outline btn-small">Logout</button></div></header>
+      <div class="dashboard-content"><div class="dashboard-title"><div><span class="eyebrow">PATIENT PORTAL</span><h1>Book an appointment</h1><p>Choose your doctor, find a time, and tell us how we can help.</p></div></div>
+        <section class="panel booking-card"><div class="step-line"><span class="step-active">1 <small>Choose doctor</small></span><i></i><span class="step-active">2 <small>Select time</small></span><i></i><span class="step-active">3 <small>Describe problem</small></span></div>
+          <div class="selectors"><div><label for="doctorSelect">Select doctor</label><select id="doctorSelect"><option value="">Choose a doctor</option></select></div><div><label for="dateSelect">Appointment date</label><input id="dateSelect" type="date"></div></div>
+          <div id="doctorInfo" class="doctor-info hidden"></div><div class="slot-heading"><h3>Available time</h3><span class="muted">Select one time slot</span></div><div id="slots" class="slots"><p class="muted">Select a doctor and date to see available times.</p></div>
+          <div class="problem-field"><label for="problemDescription">Describe your problem <span>(visible to your doctor and hospital admin)</span></label><textarea id="problemDescription" rows="4" maxlength="2000" placeholder="Briefly describe your symptoms or reason for the visit..."></textarea><div class="field-help"><span>Do not use this form for medical emergencies.</span><span id="problemCount">0 / 2000</span></div></div>
+          <div class="booking-footer"><p id="bookingSummary" class="muted">Select a doctor, date and time to continue.</p><button id="bookAppointmentBtn" class="btn btn-primary" disabled>Book appointment →</button></div>
+        </section>
+        <section class="panel"><div class="panel-heading"><div><h2>My appointments</h2><p>Review your appointment requests and their status.</p></div><button id="refreshPatientAppointmentsBtn" class="btn btn-outline btn-small">Refresh</button></div><div id="patientAppointmentList" class="appointment-list"><p class="muted">Loading appointments...</p></div></section>
+      </div>
     </section>
 
-    <section id="adminScreen" class="hidden">
-      <header class="topbar">
-        <div>
-          <h1>Admin Panel</h1>
-          <p>Welcome, <span id="adminName"></span></p>
-        </div>
-        <button id="adminLogoutBtn" class="secondary">Logout</button>
-      </header>
-
-      <section class="card admin-card">
-        <div class="admin-heading">
-          <div>
-            <h2>Appointments</h2>
-            <p class="hint">Confirm or cancel patient appointment requests.</p>
-          </div>
-          <button id="refreshAppointmentsBtn" class="secondary">Refresh</button>
-        </div>
-        <div id="appointmentList" class="appointment-list">
-          <p class="muted">Loading appointments...</p>
-        </div>
-      </section>
+    <section id="adminScreen" class="dashboard hidden">
+      <header class="dashboard-header"><a href="#home" class="brand" id="adminBrand"><span class="brand-mark">✚</span><span>CityCare <b>Hospital</b><small>Administration</small></span></a><div class="welcome-user"><span class="avatar admin-avatar">A</span><span>Welcome, <b id="adminName"></b></span><button id="adminLogoutBtn" class="btn btn-outline btn-small">Logout</button></div></header>
+      <div class="dashboard-content"><div class="dashboard-title"><div><span class="eyebrow">ADMINISTRATION</span><h1>Appointment management</h1><p>Review patient problems and manage appointment requests.</p></div><button id="refreshAppointmentsBtn" class="btn btn-outline">↻ Refresh</button></div><section class="panel admin-card"><div id="appointmentList" class="appointment-list"><p class="muted">Loading appointments...</p></div></section></div>
     </section>
 
-    <div id="message" class="message hidden"></div>
+    <section id="doctorScreen" class="dashboard hidden">
+      <header class="dashboard-header"><a href="#home" class="brand" id="doctorBrand"><span class="brand-mark">✚</span><span>CityCare <b>Hospital</b><small>Doctor portal</small></span></a><div class="welcome-user"><span class="avatar doctor-avatar">D</span><span>Welcome, <b id="doctorName"></b></span><button id="doctorLogoutBtn" class="btn btn-outline btn-small">Logout</button></div></header>
+      <div class="dashboard-content"><div class="dashboard-title"><div><span class="eyebrow">DOCTOR PORTAL</span><h1>Today's patients</h1><p>Only appointments scheduled for today are shown here.</p></div><button id="refreshDoctorAppointmentsBtn" class="btn btn-outline">↻ Refresh</button></div><section class="panel"><div id="doctorAppointmentList" class="appointment-list"><p class="muted">Loading today's patients...</p></div></section></div>
+    </section>
+    <div id="message" class="message hidden" role="status" aria-live="polite"></div>
   </main>
   <script src="script.js"></script>
 </body>
